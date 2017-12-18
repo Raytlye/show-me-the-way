@@ -3,7 +3,10 @@
 <head>
     <title>Show Me The Way</title>
     <meta charset='utf-8' />
-    <link rel='stylesheet' href='//cdnjs.cloudflare.com/ajax/libs/leaflet/0.5/leaflet.css' />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"
+    integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ=="
+    crossorigin=""/>
+    <!-- <link rel='stylesheet' href='//cdnjs.cloudflare.com/ajax/libs/leaflet/0.5/leaflet.css' /> -->
     <link rel='stylesheet' href='css/style.css' />
     <link rel='stylesheet' href='css/site.css' />
     <!--[if lte IE 8]><link rel='stylesheet' href='http://cdn.leafletjs.com/leaflet-0.5/leaflet.ie.css' /><![endif]-->
@@ -30,7 +33,10 @@
      <%= past_tense[change.type] %> <a target='_blank' href='//openstreetmap.org/browse/<%= change.meta.type %>/<%= change.meta.id %>'><%= change.tagtext %></a>
     </p>
     </script>
-    <script src='//cdnjs.cloudflare.com/ajax/libs/leaflet/0.5/leaflet.js'></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+    <script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js" integrity="sha512-lInM/apFSqyy1o6s89K4iQUKg6ppXEgsVxT35HbzUupEVRh2Eu9Wdl4tHj7dZO0s1uvplcYGmt3498TtHq+log=="
+        crossorigin=""></script>
+    <script src='js/leaflet.ajax.min.js'></script>
     <script src='js/Bing.js'></script>
     <script src='js/bundle.js'></script>
     <script type="text/javascript">
