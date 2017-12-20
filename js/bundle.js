@@ -306,7 +306,7 @@ function drawWay(change, cb) {
         L.marker([lat, lon], {
             opacity: 1,
         }).addTo(lineGroup);
-        newLine = null;
+        newLine = undefined;
     }
     // This is a bit lower than 3000 because we want the whole way
     // to stay on the screen for a bit before moving on.
