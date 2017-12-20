@@ -85,6 +85,9 @@ var changeset_tmpl = _.template(document.getElementById('changeset-template').in
 var queue = [];
 var changeset_cache = LRU(50);
 
+// pruneLines switcher
+var switcher = false;
+
 // Remove Leaflet shoutouts
 map.attributionControl.setPrefix('');
 overview_map.attributionControl.setPrefix('');
@@ -166,18 +169,26 @@ var runSpeed = 2000;
 osmStream.runFn(function(err, data) {
     queue = _.filter(data, function(f) {
         var is_a_way = (f.old && f.old.type === 'way') || (f.neu && f.neu.type === 'way');
-        if (is_a_way) {
+        var is_a_node = (f.old && f.old.type === 'node') || (f.neu && f.neu.type === 'node');
+        if (is_a_way || is_a_node) {
+            console.log('is a way');
             var bbox_intersects_old = (f.old && f.old.bounds && bbox.intersects(makeBbox(f.old.bounds)));
             var bbox_intersects_new = (f.neu && f.neu.bounds && bbox.intersects(makeBbox(f.neu.bounds)));
             var happened_today = moment((f.neu && f.neu.timestamp) || (f.neu && f.neu.timestamp)).format("MMM Do YY") === moment().format("MMM Do YY");
             var user_not_ignored = (f.old && ignore.indexOf(f.old.user) === -1) || (f.neu && ignore.indexOf(f.neu.user) === -1);
-            var way_long_enough = (f.old && f.old.linestring && f.old.linestring.length > 4) || (f.neu && f.neu.linestring && f.neu.linestring.length > 4);
+            var way_long_enough = (f.old && f.old.linestring && f.old.linestring.length) || (f.neu && f.neu.linestring && f.neu.linestring.length);
+            if(is_a_way){
+              switcher = false;
+            } else {
+              switcher = true;
+            }
             return is_a_way &&
                 (bbox_intersects_old || bbox_intersects_new) &&
                 happened_today &&
                 user_not_ignored &&
                 way_long_enough;
         } else {
+            console.log('neither way nor node');
             return false;
         }
     }).sort(function(a, b) {
@@ -249,7 +260,9 @@ function setTagText(change) {
 }
 
 function drawWay(change, cb) {
-    pruneLines();
+    if(!switcher){
+        pruneLines();
+    }
 
     var way = change.type === 'delete' ? change.old : change.neu;
     change.meta = {
@@ -281,11 +294,19 @@ function drawWay(change, cb) {
             color: color,
             fill: color
         }).addTo(lineGroup);
-    } else {
+    } else if (way.tags.highway || way.tags.natural || way.tags.leisure || way.tags.waterway || way.tags.barrier || way.tags.landuse || way.tags.power) {
         newLine = L.polyline([], {
             opacity: 1,
             color: color
         }).addTo(lineGroup);
+    } else {
+        const lat = parseFloat(way.linestring.pop());
+        const lon = parseFloat(way.linestring.pop());
+        console.log('marked');
+        L.marker([lat, lon], {
+            opacity: 1,
+        }).addTo(lineGroup);
+        newLine = null;
     }
     // This is a bit lower than 3000 because we want the whole way
     // to stay on the screen for a bit before moving on.
@@ -301,9 +322,10 @@ function drawWay(change, cb) {
             window.setTimeout(cb, perPt * 2);
         }
     }
-
-    newLine.addLatLng(way.linestring.pop());
-    drawPt(way.linestring.pop());
+    if(newLine) {
+        newLine.addLatLng(way.linestring.pop());
+        drawPt(way.linestring.pop());
+    }
 }
 
 doDrawWay();
