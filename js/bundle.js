@@ -85,9 +85,6 @@ var changeset_tmpl = _.template(document.getElementById('changeset-template').in
 var queue = [];
 var changeset_cache = LRU(50);
 
-// pruneLines switcher
-var switcher = false;
-
 // Remove Leaflet shoutouts
 map.attributionControl.setPrefix('');
 overview_map.attributionControl.setPrefix('');
@@ -176,12 +173,7 @@ osmStream.runFn(function(err, data) {
             var bbox_intersects_new = (f.neu && f.neu.bounds && bbox.intersects(makeBbox(f.neu.bounds)));
             var happened_today = moment((f.neu && f.neu.timestamp) || (f.neu && f.neu.timestamp)).format("MMM Do YY") === moment().format("MMM Do YY");
             var user_not_ignored = (f.old && ignore.indexOf(f.old.user) === -1) || (f.neu && ignore.indexOf(f.neu.user) === -1);
-            var way_long_enough = (f.old && f.old.linestring && f.old.linestring.length) || (f.neu && f.neu.linestring && f.neu.linestring.length);
-            if(is_a_way){
-              switcher = false;
-            } else {
-              switcher = true;
-            }
+            var way_long_enough = (f.old && f.old.linestring && f.old.linestring.length >= 1) || (f.neu && f.neu.linestring && f.neu.linestring.length >= 1);
             return is_a_way &&
                 (bbox_intersects_old || bbox_intersects_new) &&
                 happened_today &&
@@ -255,14 +247,14 @@ function setTagText(change) {
             return change;
         }
     }
+    var tags = change.type === 'delete' ? change.old.tags : change.neu.tags;
+    console.log(tags[0]);
     change.tagtext = 'a way';
     return change;
 }
 
 function drawWay(change, cb) {
-    if(!switcher){
-        pruneLines();
-    }
+    pruneLines();
 
     var way = change.type === 'delete' ? change.old : change.neu;
     change.meta = {
@@ -300,13 +292,12 @@ function drawWay(change, cb) {
             color: color
         }).addTo(lineGroup);
     } else {
-        const lat = parseFloat(way.linestring.pop());
-        const lon = parseFloat(way.linestring.pop());
+        const node = way.linestring.pop();
         console.log('marked');
-        L.marker([lat, lon], {
+        console.log(node[0], node[1]);
+        L.marker([node[0], node[1]], {
             opacity: 1,
-        }).addTo(lineGroup);
-        newLine = undefined;
+        }).addTo(map);
     }
     // This is a bit lower than 3000 because we want the whole way
     // to stay on the screen for a bit before moving on.
