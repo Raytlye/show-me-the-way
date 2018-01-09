@@ -167,20 +167,36 @@ osmStream.runFn(function(err, data) {
     queue = _.filter(data, function(f) {
         var is_a_way = (f.old && f.old.type === 'way') || (f.neu && f.neu.type === 'way');
         var is_a_node = (f.old && f.old.type === 'node') || (f.neu && f.neu.type === 'node');
-        if (is_a_way || is_a_node) {
+        if (is_a_way) {
             console.log('is a way');
             var bbox_intersects_old = (f.old && f.old.bounds && bbox.intersects(makeBbox(f.old.bounds)));
             var bbox_intersects_new = (f.neu && f.neu.bounds && bbox.intersects(makeBbox(f.neu.bounds)));
             var happened_today = moment((f.neu && f.neu.timestamp) || (f.neu && f.neu.timestamp)).format("MMM Do YY") === moment().format("MMM Do YY");
             var user_not_ignored = (f.old && ignore.indexOf(f.old.user) === -1) || (f.neu && ignore.indexOf(f.neu.user) === -1);
-            var way_long_enough = (f.old && f.old.linestring && f.old.linestring.length >= 1) || (f.neu && f.neu.linestring && f.neu.linestring.length >= 1);
+            var way_long_enough = (f.old && f.old.linestring && f.old.linestring.length > 4) || (f.neu && f.neu.linestring && f.neu.linestring.length > 4);
             return is_a_way &&
                 (bbox_intersects_old || bbox_intersects_new) &&
                 happened_today &&
                 user_not_ignored &&
                 way_long_enough;
+        } else if (is_a_node) {
+            console.log('is a node');
+            var bbox_intersects_old = (f.old && f.old.bounds && bbox.intersects(makeBbox(f.old.bounds)));
+            var bbox_intersects_new = (f.neu && f.neu.bounds && bbox.intersects(makeBbox(f.neu.bounds)));
+            var happened_today = moment((f.neu && f.neu.timestamp) || (f.neu && f.neu.timestamp)).format("MMM Do YY") === moment().format("MMM Do YY");
+            var user_not_ignored = (f.old && ignore.indexOf(f.old.user) === -1) || (f.neu && ignore.indexOf(f.neu.user) === -1);
+            var way_long_enough = (f.old && f.old.linestring && f.old.linestring.length >= 1) || (f.neu && f.neu.linestring && f.neu.linestring.length >= 1);
+            return is_a_node &&
+                (bbox_intersects_old || bbox_intersects_new) &&
+                happened_today &&
+                user_not_ignored &&
+                way_long_enough;
         } else {
-            console.log('neither way nor node');
+            if(f.old) {
+              console.log(f.old + ' ' + f.old.type);
+            } else {
+              console.log(f.neu + ' ' + f.neu.type);
+            }
             return false;
         }
     }).sort(function(a, b) {
@@ -195,32 +211,39 @@ function doDrawWay() {
     document.getElementById('queuesize').innerHTML = queue.length;
     if (queue.length) {
         var change = queue.pop();
-        var way = change.neu || change.old;
+        var geometry = change.neu || change.old;
 
+        if (geometry.type === 'way') {
+          var way = geometry;
         // Skip ways that are part of a changeset we don't care about
-        if (changeset_comment_match && way.changeset) {
-            fetchChangesetData(way.changeset, function(err, changeset_data) {
-                if (err) {
-                    console.log("Error filtering changeset: " + err);
-                    doDrawWay();
-                    return;
-                }
+          if (changeset_comment_match && way.changeset) {
+              fetchChangesetData(way.changeset, function(err, changeset_data) {
+                  if (err) {
+                      console.log("Error filtering changeset: " + err);
+                      doDrawWay();
+                      return;
+                  }
 
-                if (changeset_data.comment && changeset_data.comment.indexOf(changeset_comment_match) > -1) {
-                    console.log("Drawing way " + way.id);
-                    drawWay(change, function() {
-                        doDrawWay();
-                    });
-                } else {
-                    console.log("Skipping way " + way.id + " because changeset " + way.changeset + " didn't match " + changeset_comment_match);
-                    doDrawWay();
-                }
-            });
-        } else {
-            drawWay(change, function() {
-                doDrawWay();
-            });
-        }
+                  if (changeset_data.comment && changeset_data.comment.indexOf(changeset_comment_match) > -1) {
+                      console.log("Drawing way " + way.id);
+                      drawWay(change, function() {
+                          doDrawWay();
+                      });
+                  } else {
+                      console.log("Skipping way " + way.id + " because changeset " + way.changeset + " didn't match " + changeset_comment_match);
+                      doDrawWay();
+                  }
+              });
+          } else {
+              drawWay(change, function() {
+                  doDrawWay();
+              });
+          }
+      } else {
+              drawNode(change, function() {
+                  doDrawWay();
+              })
+      }
     } else {
         window.setTimeout(doDrawWay, runSpeed);
     }
@@ -286,19 +309,19 @@ function drawWay(change, cb) {
             color: color,
             fill: color
         }).addTo(lineGroup);
-    } else if (way.tags.highway || way.tags.natural || way.tags.leisure || way.tags.waterway || way.tags.barrier || way.tags.landuse || way.tags.power) {
+    } else {//if (way.tags.highway || way.tags.natural || way.tags.leisure || way.tags.waterway || way.tags.barrier || way.tags.landuse || way.tags.power) {
         newLine = L.polyline([], {
             opacity: 1,
             color: color
         }).addTo(lineGroup);
-    } else {
+    } /* else {
         const node = way.linestring.pop();
         console.log('marked');
         console.log(node[0], node[1]);
         L.marker([node[0], node[1]], {
             opacity: 1,
         }).addTo(map);
-    }
+    } */
     // This is a bit lower than 3000 because we want the whole way
     // to stay on the screen for a bit before moving on.
     var perPt = runSpeed / way.linestring.length;
@@ -317,6 +340,39 @@ function drawWay(change, cb) {
         newLine.addLatLng(way.linestring.pop());
         drawPt(way.linestring.pop());
     }
+}
+
+function drawNode(change, cb) {
+
+    var node = change.type === 'delete' ? change.old : change.neu;
+    change.meta = {
+        id: node.id,
+        type: node.type,
+        // Always pull in the new side user, timestamp, and changeset info
+        user: change.neu.user,
+        changeset: change.neu.changeset
+    };
+
+    // Zoom to the area in question
+    var bounds = makeBbox(node.bounds);
+
+    if (farFromLast(bounds.getCenter())) showLocation(bounds.getCenter());
+    showComment(change.neu.changeset);
+
+    var timedate = moment(change.neu.timestamp);
+    change.timetext = timedate.fromNow();
+
+    map.fitBounds(bounds);
+    overview_map.panTo(bounds.getCenter());
+    setTagText(change);
+    changeset_info.innerHTML = changeset_tmpl({ change: change });
+
+    const nodeCoordinates = node.linestring.pop();
+    console.log('marked');
+    console.log(nodeCoordinates[0], nodeCoordinates[1]);
+    L.marker([nodeCoordinates[0], nodeCoordinates[1]], {
+      opacity: 1,
+    }).addTo(map);
 }
 
 doDrawWay();
